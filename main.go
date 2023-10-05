@@ -81,6 +81,21 @@ func defineOpcode(line string) {
 				// Print the assembly representation of the instruction
 				fmt.Printf("%s R%d, R%d, R%d\n", inst.Mnemonic, rd, rn, rm)
 				// TODO: Handle other instruction types (I, B, CB, etc.)
+
+			case "I":
+				imm := extractBits(line, 10, 21)
+				rn := extractBits(line, 22, 26)
+				rd := extractBits(line, 27, 31)
+				fmt.Printf("%s R%d, R%d, #%d\n", inst.Mnemonic, rd, rn, imm)
+
+			case "CB":
+				imm := extractBits(line, 8, 26) // Extract the address offset
+				rt := extractBits(line, 27, 31) // Extract the register to test
+				fmt.Printf("%s R%d, #%d\n", inst.Mnemonic, rt, imm)
+
+				//case "IM":
+				//imm := extrctBits()
+
 			}
 		} else {
 
