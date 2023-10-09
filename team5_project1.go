@@ -46,6 +46,9 @@ var opcodeMap = map[string]Instruction{
 	"11111000010": {"LDUR", "D"},
 	"11010011100": {"ASR", "R"},
 	"11101010000": {"EOR", "R"},
+
+	// BREAK code
+	"11111110110111101111111111100111": {"BREAK", "BREAK"},
 }
 
 func main() {
@@ -106,8 +109,13 @@ func defineOpcode(line string, memCounter *int) string {
 	// Ensure the line is long enough to contain the opcode
 	if len(line) >= 6 { // Minimum opcode size is 6
 
+		if len(line) >= 32 {
+			opcode = line[:32]
+			inst, exists = opcodeMap[opcode]
+		}
+
 		// Check for 11-bit opcode
-		if len(line) >= 11 {
+		if !exists && len(line) >= 11 {
 			opcode = line[:11]
 			inst, exists = opcodeMap[opcode]
 		}
@@ -189,6 +197,8 @@ func defineOpcode(line string, memCounter *int) string {
 
 			case "N/A":
 				return fmt.Sprintf("%s %d NOP", line, *memCounter)
+			case "BREAK":
+				return fmt.Sprintf("%s %d BREAK", line[0:1]+" "+line[1:6]+" "+line[6:11]+" "+line[11:16]+" "+line[16:21]+" "+line[21:26]+" "+line[26:], *memCounter)
 			}
 		}
 	} else {
