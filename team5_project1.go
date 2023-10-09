@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -206,6 +207,10 @@ func defineOpcode(line string, memCounter *int) string {
 		return fmt.Sprintf("Unknown instruction with opcode: %s at address %d", opcode, *memCounter)
 	}
 
+	if len(line) == 32 {
+		decInt := binToDec(line)
+		return fmt.Sprintf("%s %d %d", line, *memCounter, decInt)
+	}
 	return fmt.Sprintf("Invalid instruction at address %d", *memCounter)
 }
 
@@ -219,4 +224,27 @@ func extractBits(line string, start, end int) int {
 		log.Fatal(err)
 	}
 	return int(value)
+}
+
+func binToDec(binline string) int {
+
+	index := 31
+	decimalNum := 0
+
+	tempdecimalNum := 0
+	for index != 0 {
+		for index == 31 {
+			templine := binline[index-1 : index]
+			ttempline, _ := strconv.Atoi(templine)
+			tempdecimalNum = tempdecimalNum + (ttempline * int(math.Pow(2, float64(index))))
+			index--
+		}
+		templine := binline[index-1 : index]
+		ttempline, _ := strconv.Atoi(templine)
+		decimalNum = decimalNum + (ttempline * int(math.Pow(2, float64(index))))
+		index--
+
+	}
+	decimalNum = decimalNum - tempdecimalNum
+	return decimalNum
 }
