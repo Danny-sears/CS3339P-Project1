@@ -75,8 +75,8 @@ func main() {
 	}
 	defer openfile.Close()
 
-	// Open the output file for writing
-	outFile, err := os.Create(*outputFile)
+	outFileNameWithSuffix := *outputFile + "_dis.txt"
+	outFile, err := os.Create(outFileNameWithSuffix)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -157,22 +157,18 @@ func defineOpcode(line string, memCounter *int) string {
 				switch inst.Mnemonic {
 				case "LSR", "LSL":
 					imm := extractBits(line, 16, 21)
-					return fmt.Sprintf("%s %d %s R%d, R%d, #%d", line[:10]+" "+line[10:15]+" "+line[16:22]+" "+line[22:27]+" "+line[27:], *memCounter, inst.Mnemonic, rd, rn, imm)
+					return fmt.Sprintf("%s\t%d\t%s R%d, R%d, #%d", line[:10]+"\t"+line[10:15]+"\t"+line[16:22]+"\t"+line[22:27]+"\t"+line[27:], *memCounter, inst.Mnemonic, rd, rn, imm)
 				default:
-					return fmt.Sprintf("%s %d %s R%d, R%d, R%d", line[:10]+" "+line[10:15]+" "+line[16:22]+" "+line[22:27]+" "+line[27:], *memCounter, inst.Mnemonic, rd, rn, rm)
+					return fmt.Sprintf("%s\t%d\t%s R%d, R%d, R%d", line[:10]+"\t"+line[10:15]+"\t"+line[16:22]+"\t"+line[22:27]+"\t"+line[27:], *memCounter, inst.Mnemonic, rd, rn, rm)
 				}
 
 			case "CB":
 				imm := extractBits(line, 8, 26)
 				rt := extractBits(line, 27, 31)
-
-				// Check if the MSB of the immediate value is 1 (indicating a negative number)
-				if (imm & (1 << 18)) != 0 { // 18 is the position of the MSB in a 19-bit number
-					// Convert the number to its two's complement negative value
-					imm = imm - (1 << 19) // Subtracting 2^19 to get the negative value
+				if (imm & (1 << 18)) != 0 {
+					imm = imm - (1 << 19)
 				}
-
-				return fmt.Sprintf("%s %d %s R%d, #%d", line[:8]+" "+line[8:27]+" "+line[27:], *memCounter, inst.Mnemonic, rt, imm)
+				return fmt.Sprintf("%s\t%d\t%s R%d, #%d", line[:8]+"\t"+line[8:27]+"\t"+line[27:], *memCounter, inst.Mnemonic, rt, imm)
 
 			case "IM":
 				immlo := extractBits(line, 9, 10)
@@ -180,27 +176,28 @@ func defineOpcode(line string, memCounter *int) string {
 				rd := extractBits(line, 27, 31)
 				imm := immhi << (immlo * 2)
 				if inst.Mnemonic == "MOVZ" {
-					return fmt.Sprintf("%s %d %s R%d,", line[:9]+" "+line[9:11]+" "+line[11:27]+" "+line[27:], *memCounter, inst.Mnemonic, rd)
+					return fmt.Sprintf("%s\t%d\t%s R%d,", line[:9]+"\t"+line[9:11]+"\t"+line[11:27]+"\t"+line[27:], *memCounter, inst.Mnemonic, rd)
 				} else if inst.Mnemonic == "MOVK" {
-					return fmt.Sprintf("%s %d %s R%d,", line[:9]+" "+line[9:11]+" "+line[11:27]+" "+line[27:], *memCounter, inst.Mnemonic, rd)
+					return fmt.Sprintf("%s\t%d\t%s R%d,", line[:9]+"\t"+line[9:11]+"\t"+line[11:27]+"\t"+line[27:], *memCounter, inst.Mnemonic, rd)
 				}
-				return fmt.Sprintf("%s %d %s R%d, #%d", line[:9]+" "+line[9:11]+" "+line[11:27]+" "+line[27:], *memCounter, inst.Mnemonic, rd, imm)
+				return fmt.Sprintf("%s\t%d\t%s R%d, #%d", line[:9]+"\t"+line[9:11]+"\t"+line[11:27]+"\t"+line[27:], *memCounter, inst.Mnemonic, rd, imm)
 
 			case "D":
-				imm := extractBits(line, 11, 19) // Extract the address offset
-				rn := extractBits(line, 20, 24)  // Extract the base register
-				rt := extractBits(line, 25, 29)  // Extract the source/destination register
-				return fmt.Sprintf("%s %d %s R%d, [R%d, #%d]", line[:11]+" "+line[11:20]+" "+line[20:25]+" "+line[25:], *memCounter, inst.Mnemonic, rt, rn, imm)
+				imm := extractBits(line, 11, 19)
+				rn := extractBits(line, 20, 24)
+				rt := extractBits(line, 25, 29)
+				return fmt.Sprintf("%s\t%d\t%s R%d, [R%d, #%d]", line[:11]+"\t"+line[11:20]+"\t"+line[20:25]+"\t"+line[25:], *memCounter, inst.Mnemonic, rt, rn, imm)
 
 			case "B":
-				imm := extractBits(line, 6, 31) // Extract the address offset
-				return fmt.Sprintf("%s %d %s #%d", line[:6]+" "+line[6:], *memCounter, inst.Mnemonic, imm)
+				imm := extractBits(line, 6, 31)
+				return fmt.Sprintf("%s\t%d\t%s #%d", line[:6]+"\t"+line[6:], *memCounter, inst.Mnemonic, imm)
 
 			case "N/A":
-				return fmt.Sprintf("%s %d NOP", line, *memCounter)
+				return fmt.Sprintf("%s\t%d\tNOP", line, *memCounter)
 			case "BREAK":
-				return fmt.Sprintf("%s %d BREAK", line[0:1]+" "+line[1:6]+" "+line[6:11]+" "+line[11:16]+" "+line[16:21]+" "+line[21:26]+" "+line[26:], *memCounter)
+				return fmt.Sprintf("%s\t%d\tBREAK", line[0:1]+"\t"+line[1:6]+"\t"+line[6:11]+"\t"+line[11:16]+"\t"+line[16:21]+"\t"+line[21:26]+"\t"+line[26:], *memCounter)
 			}
+
 		}
 	} else {
 
@@ -209,8 +206,9 @@ func defineOpcode(line string, memCounter *int) string {
 
 	if len(line) == 32 {
 		decInt := binToDec(line)
-		return fmt.Sprintf("%s %d %d", line, *memCounter, decInt)
+		return fmt.Sprintf("%s\t%d\t%d", line, *memCounter, decInt)
 	}
+
 	return fmt.Sprintf("Invalid instruction at address %d", *memCounter)
 }
 
