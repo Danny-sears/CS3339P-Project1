@@ -157,9 +157,11 @@ func defineOpcode(line string, memCounter *int) string {
 				switch inst.Mnemonic {
 				case "LSR", "LSL":
 					imm := extractBits(line, 16, 21)
-					return fmt.Sprintf("%s\t%d\t%s R%d, R%d, #%d", line[:10]+"\t"+line[10:15]+"\t"+line[16:22]+"\t"+line[22:27]+"\t"+line[27:], *memCounter, inst.Mnemonic, rd, rn, imm)
+					return fmt.Sprintf("%s %s %s %s %s\t%d\t%s\tR%d, R%d, #%d", line[:11], line[11:16], line[16:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, imm)
+
 				default:
-					return fmt.Sprintf("%s\t%d\t%s R%d, R%d, R%d", line[:10]+"\t"+line[10:15]+"\t"+line[16:22]+"\t"+line[22:27]+"\t"+line[27:], *memCounter, inst.Mnemonic, rd, rn, rm)
+					return fmt.Sprintf("%s %s %s %s %s\t%d\t%s\tR%d, R%d, R%d", line[:11], line[11:16], line[16:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, rm)
+
 				}
 
 			case "CB":
@@ -174,27 +176,42 @@ func defineOpcode(line string, memCounter *int) string {
 
 				return fmt.Sprintf("%s %d %s R%d, #%d", line[:8]+" "+line[8:27]+" "+line[27:], *memCounter, inst.Mnemonic, rt, imm)
 
+			case "I":
+				imm := extractBits(line, 10, 21)
+				rn := extractBits(line, 22, 26)
+				rd := extractBits(line, 27, 31)
+
+				return fmt.Sprintf("%s %s %s %s\t%d\t%s R%d, R%d, #%d", line[:10], line[10:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, imm)
+
 			case "IM":
 				immlo := extractBits(line, 9, 10)
 				immhi := extractBits(line, 11, 26)
 				rd := extractBits(line, 27, 31)
-				imm := immhi << (immlo * 2)
+				shiftAmount := immlo * 16
 				if inst.Mnemonic == "MOVZ" {
-					return fmt.Sprintf("%s\t%d\t%s R%d,", line[:9]+"\t"+line[9:11]+"\t"+line[11:27]+"\t"+line[27:], *memCounter, inst.Mnemonic, rd)
+					return fmt.Sprintf("%s %s %s %s\t%d\t%s R%d, %d, LSL %d", line[:9], line[9:11], line[11:27], line[27:], *memCounter, inst.Mnemonic, rd, immhi, shiftAmount)
 				} else if inst.Mnemonic == "MOVK" {
-					return fmt.Sprintf("%s\t%d\t%s R%d,", line[:9]+"\t"+line[9:11]+"\t"+line[11:27]+"\t"+line[27:], *memCounter, inst.Mnemonic, rd)
+					return fmt.Sprintf("%s %s %s %s\t%d\t%s R%d, %d, LSL %d", line[:9], line[9:11], line[11:27], line[27:], *memCounter, inst.Mnemonic, rd, immhi, shiftAmount)
 				}
-				return fmt.Sprintf("%s\t%d\t%s R%d, #%d", line[:9]+"\t"+line[9:11]+"\t"+line[11:27]+"\t"+line[27:], *memCounter, inst.Mnemonic, rd, imm)
 
 			case "D":
 				imm := extractBits(line, 11, 19)
-				rn := extractBits(line, 20, 24)
-				rt := extractBits(line, 25, 29)
-				return fmt.Sprintf("%s\t%d\t%s R%d, [R%d, #%d]", line[:11]+"\t"+line[11:20]+"\t"+line[20:25]+"\t"+line[25:], *memCounter, inst.Mnemonic, rt, rn, imm)
+				rn := extractBits(line, 22, 26)
+				rt := extractBits(line, 27, 31)
+				return fmt.Sprintf("%s %s %s %s %s\t%d\t%s R%d, [R%d, #%d]", line[:11], line[11:20], line[20:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rt, rn, imm)
 
 			case "B":
-				imm := extractBits(line, 6, 31)
-				return fmt.Sprintf("%s\t%d\t%s #%d", line[:6]+"\t"+line[6:], *memCounter, inst.Mnemonic, imm)
+				immStr := line[6:32]
+
+				imm, _ := strconv.ParseInt(immStr, 2, 64)
+
+				if immStr[0] == '1' {
+					imm = int64(twosComplement(immStr))
+				}
+
+				imm = imm << 2
+
+				return fmt.Sprintf("%s %s\t%d\t%s #%d", line[:6], line[6:], *memCounter, inst.Mnemonic, imm)
 
 			case "N/A":
 				return fmt.Sprintf("%s\t%d\tNOP", line, *memCounter)
@@ -249,4 +266,13 @@ func binToDec(binline string) int {
 	}
 	decimalNum = decimalNum - tempdecimalNum
 	return decimalNum
+}
+
+func twosComplement(binStr string) int {
+
+	num, _ := strconv.ParseInt(binStr, 2, 64)
+
+	num = (1 << len(binStr)) - num
+
+	return -int(num)
 }
