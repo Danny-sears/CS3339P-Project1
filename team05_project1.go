@@ -167,10 +167,10 @@ func defineOpcode(line string, memCounter *int) string {
 				rt := extractBits(line, 27, 31)
 
 				// Check if the MSB of the immediate value is 1 (indicating a negative number)
-				if (imm & (1 << 18)) != 0 { // 18 is the position of the MSB in a 19-bit number
-					// Convert the number to its two's complement negative value
-					imm = imm - (1 << 19) // Subtracting 2^19 to get the negative value
-				}
+				//if (imm & (1 << 18)) != 0 { // 18 is the position of the MSB in a 19-bit number
+				// Convert the number to its two's complement negative value
+				//imm = imm - (1 << 19) // Subtracting 2^19 to get the negative value
+				//}
 
 				return fmt.Sprintf("%s %d %s R%d, #%d", line[:8]+" "+line[8:27]+" "+line[27:], *memCounter, inst.Mnemonic, rt, imm)
 
