@@ -201,17 +201,20 @@ func defineOpcode(line string, memCounter *int) string {
 				return fmt.Sprintf("%s %s %s %s %s\t%d\t%s R%d, [R%d, #%d]", line[:11], line[11:20], line[20:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rt, rn, imm)
 
 			case "B":
-				immStr := line[6:32]
+				opcodePart := line[:6]
+				rawOffset := extractBits(line, 7, 31)
+				signBit := extractBits(line, 6, 6)
 
-				imm, _ := strconv.ParseInt(immStr, 2, 64)
-
-				if immStr[0] == '1' {
-					imm = int64(twosComplement(immStr))
+				// If the sign bit is 1, it's a negative number
+				if signBit == 1 {
+					rawOffset = -(^(rawOffset - 1))
 				}
 
-				imm = imm << 2
+				// Calculate the actual offset for display
+				displayOffset := rawOffset
 
-				return fmt.Sprintf("%s %s\t%d\t%s #%d", line[:6], line[6:], *memCounter, inst.Mnemonic, imm)
+				formattedOutput := fmt.Sprintf("%s %s\t%d\t%s #%d", opcodePart, line[6:], *memCounter, inst.Mnemonic, displayOffset)
+				return formattedOutput
 
 			case "N/A":
 				return fmt.Sprintf("%s\t%d\tNOP", line, *memCounter)
