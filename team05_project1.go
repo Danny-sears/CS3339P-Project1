@@ -213,7 +213,7 @@ func defineOpcode(line string, memCounter *int) string {
 				// Calculate the actual offset for display
 				displayOffset := rawOffset
 
-				formattedOutput := fmt.Sprintf("%s %s\t%d\t%s #%d", opcodePart, line[6:], *memCounter, inst.Mnemonic, displayOffset)
+				formattedOutput := fmt.Sprintf("%s %s\t%d\t%s #%d", opcodePart, line[7:], *memCounter, inst.Mnemonic, displayOffset)
 				return formattedOutput
 
 			case "N/A":
