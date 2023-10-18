@@ -168,13 +168,7 @@ func defineOpcode(line string, memCounter *int) string {
 				imm := extractBits(line, 8, 26)
 				rt := extractBits(line, 27, 31)
 
-				// Check if the MSB of the immediate value is 1 (indicating a negative number)
-				//if (imm & (1 << 18)) != 0 { // 18 is the position of the MSB in a 19-bit number
-				// Convert the number to its two's complement negative value
-				//imm = imm - (1 << 19) // Subtracting 2^19 to get the negative value
-				//}
-
-				return fmt.Sprintf("%s %d %s R%d, #%d", line[:8]+" "+line[8:27]+" "+line[27:], *memCounter, inst.Mnemonic, rt, imm)
+				return fmt.Sprintf("%s\t%d\t%s R%d, #%d", line[:8]+" "+line[8:27]+" "+line[27:], *memCounter, inst.Mnemonic, rt, imm)
 
 			case "I":
 				imm := extractBits(line, 10, 21)
@@ -219,7 +213,7 @@ func defineOpcode(line string, memCounter *int) string {
 			case "N/A":
 				return fmt.Sprintf("%s\t%d\tNOP", line, *memCounter)
 			case "BREAK":
-				return fmt.Sprintf("%s\t%d\tBREAK", line[0:1]+"\t"+line[1:6]+"\t"+line[6:11]+"\t"+line[11:16]+"\t"+line[16:21]+"\t"+line[21:26]+"\t"+line[26:], *memCounter)
+				return fmt.Sprintf("%s\t%d\t%s", line[:8]+" "+line[8:11]+" "+line[11:16]+" "+line[16:21]+" "+line[21:26]+" "+line[26:], *memCounter, inst.Mnemonic)
 			}
 
 		}
@@ -229,7 +223,7 @@ func defineOpcode(line string, memCounter *int) string {
 	}
 
 	if len(line) == 32 {
-		decInt := binToDec(line)
+		decInt := twosComplement(line)
 		return fmt.Sprintf("%s\t%d\t%d", line, *memCounter, decInt)
 	}
 
