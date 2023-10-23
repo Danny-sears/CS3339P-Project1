@@ -195,14 +195,13 @@ func defineOpcode(line string, memCounter *int) string {
 			case "B":
 				opcodePart := line[:6]
 				rawOffset := extractBits(line, 7, 31)
-				//signBit := extractBits(line, 6, 6)
+				signBit := extractBits(line, 6, 6)
 
-				// If the sign bit is 1, it's a negative number
-				//if signBit == 1 {
-				//rawOffset = -(^(rawOffset - 1))
-				//}
+				//If the sign bit is 1, it's a negative number
+				if signBit == 1 {
+					rawOffset = -(^(rawOffset - 1))
+				}
 
-				// COMMENTED OUT BECAUSE THE PROFESSOR WANTS THESE INTS POSITIVE
 				// Calculate the actual offset for display
 				displayOffset := rawOffset
 
