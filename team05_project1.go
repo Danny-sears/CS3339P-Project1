@@ -196,16 +196,18 @@ func defineOpcode(line string, memCounter *int) string {
 				opcodePart := line[:6]
 				rawOffset := extractBits(line, 7, 31)
 				signBit := extractBits(line, 6, 6)
+				signSym := ""
 
 				//If the sign bit is 1, it's a negative number
 				if signBit == 1 {
 					rawOffset = -(^(rawOffset - 1))
+					signSym = "-"
 				}
 
 				// Calculate the actual offset for display
 				displayOffset := rawOffset
 
-				return fmt.Sprintf("%s %s"+"\t%d\t%s\t#%d", opcodePart, line[6:], *memCounter, inst.Mnemonic, displayOffset)
+				return fmt.Sprintf("%s %s"+"\t%d\t%s\t#%s%d", opcodePart, line[6:], *memCounter, inst.Mnemonic, signSym, displayOffset)
 
 			case "N/A":
 				return fmt.Sprintf("%s"+"\t%d\tNOP", line, *memCounter)
