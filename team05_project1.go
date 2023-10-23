@@ -196,18 +196,18 @@ func defineOpcode(line string, memCounter *int) string {
 				opcodePart := line[:6]
 				rawOffset := extractBits(line, 7, 31)
 				signBit := extractBits(line, 6, 6)
-				signSym := ""
 
 				//If the sign bit is 1, it's a negative number
 				if signBit == 1 {
+					rawOffset = twosComplement(strconv.Itoa(rawOffset), 64)
 					rawOffset = -(^(rawOffset - 1))
-					signSym = "-"
+					//BROKEN
 				}
 
 				// Calculate the actual offset for display
 				displayOffset := rawOffset
 
-				return fmt.Sprintf("%s %s"+"\t%d\t%s\t#%s%d", opcodePart, line[6:], *memCounter, inst.Mnemonic, signSym, displayOffset)
+				return fmt.Sprintf("%s %s"+"\t%d\t%s\t#%d", opcodePart, line[6:], *memCounter, inst.Mnemonic, displayOffset)
 
 			case "N/A":
 				return fmt.Sprintf("%s"+"\t%d\tNOP", line, *memCounter)
@@ -222,7 +222,7 @@ func defineOpcode(line string, memCounter *int) string {
 	}
 
 	if len(line) == 32 {
-		decInt := twosComplement(line)
+		decInt := twosComplement(line, 64)
 		return fmt.Sprintf("%s"+"\t%d\t%d", line, *memCounter, decInt)
 	}
 
@@ -264,9 +264,9 @@ func binToDec(binline string) int {
 	return decimalNum
 }
 
-func twosComplement(binStr string) int {
+func twosComplement(binStr string, bitSize int) int {
 
-	num, _ := strconv.ParseInt(binStr, 2, 64)
+	num, _ := strconv.ParseInt(binStr, 2, bitSize)
 
 	num = (1 << len(binStr)) - num
 
