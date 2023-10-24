@@ -253,7 +253,7 @@ func defineOpcode(line string, memCounter *int) string {
 			case "N/A":
 				return fmt.Sprintf("%s"+"\t%d\tNOP", line, *memCounter)
 			case "BREAK":
-				return fmt.Sprintf("%s"+"\t%d\t%s", line, *memCounter, inst.Mnemonic)
+				return fmt.Sprintf("%s %s %s %s %s %s"+"\t%d\t%s", line[:8], line[8:11], line[11:16], line[16:21], line[21:26], line[26:], *memCounter, inst.Mnemonic)
 			}
 
 		}
