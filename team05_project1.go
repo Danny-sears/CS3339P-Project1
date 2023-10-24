@@ -50,6 +50,7 @@ var opcodeMap = map[string]Instruction{
 
 	// BREAK code
 	"11111110110111101111111111100111": {"BREAK", "BREAK"},
+	"00000000000000000000000000000000": {"NOP", "NOP"},
 }
 
 func main() {
@@ -165,15 +166,44 @@ func defineOpcode(line string, memCounter *int) string {
 			case "CB":
 				imm := extractBits(line, 8, 26)
 				rt := extractBits(line, 27, 31)
+				//negBitMask := 0x00200000
+				//extendMask := 0xFFC00000
+				var snum int32
 
-				return fmt.Sprintf("%s %s %s\t%d\t%s\tR%d, #%d", line[:8], line[8:27], line[27:], *memCounter, inst.Mnemonic, rt, imm)
+				binaryImm := fmt.Sprintf("%019b", imm) // Convert imm to a 19-bit binary string
+				if binaryImm[0] == '1' {               // Check if the most significant bit is 1
+					// Convert from two's complement to positive binary number
+					invertedBinaryImm := ""
+					for _, bit := range binaryImm {
+						if bit == '0' {
+							invertedBinaryImm += "1"
+						} else {
+							invertedBinaryImm += "0"
+						}
+					}
+					positiveBinaryImm := addBinary(invertedBinaryImm, "1")
+					snum = -int32(binaryToDecimal(positiveBinaryImm))
+				} else {
+					snum = int32(binaryToDecimal(binaryImm))
+				}
+
+				return fmt.Sprintf("%s %s %s\t%d\t%s\tR%d, #%d", line[:8], line[8:27], line[27:], *memCounter, inst.Mnemonic, rt, snum)
 
 			case "I":
 				imm := extractBits(line, 10, 21)
 				rn := extractBits(line, 22, 26)
 				rd := extractBits(line, 27, 31)
-
-				return fmt.Sprintf("%s %s %s %s\t%d\t%s\tR%d, R%d, #%d", line[:10], line[10:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, imm)
+				negBitMask := 0x800 // figure out if 12 bit num is neg
+				extendMask := 0xFFFFF000
+				var simm int32
+				simm = int32(imm)
+				if (negBitMask & imm) > 0 { // is it?
+					imm = imm | extendMask // if so extend with 1's
+					imm = imm ^ 0xFFFFFFFF // 2s comp
+					simm = int32(imm + 1)
+					simm = simm * -1 // add neg sign
+				}
+				return fmt.Sprintf("%s %s %s %s\t%d\t%s\tR%d, R%d, #%d", line[:10], line[10:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, simm)
 
 			case "IM":
 				immlo := extractBits(line, 9, 10)
@@ -195,18 +225,31 @@ func defineOpcode(line string, memCounter *int) string {
 			case "B":
 				opcodePart := line[:6]
 				rawOffset := extractBits(line, 7, 31)
-				signBit := extractBits(line, 6, 6)
+				//negBitMask := 0x02000000
+				//extendMask := 0xFC000000
+				var snum int32
 
-				// If the sign bit is 1, it's a negative number
-				if signBit == 1 {
-					rawOffset = -(^(rawOffset - 1))
+				binaryOffset := fmt.Sprintf("%025b", rawOffset) // Convert rawOffset to a 25-bit binary string
+				if binaryOffset[0] == '1' {                     // Check if the most significant bit is 1
+					// Convert from two's complement to positive binary number
+					invertedBinaryOffset := ""
+					for _, bit := range binaryOffset {
+						if bit == '0' {
+							invertedBinaryOffset += "1"
+						} else {
+							invertedBinaryOffset += "0"
+						}
+					}
+					positiveBinaryOffset := addBinary(invertedBinaryOffset, "1")
+					snum = -int32(binaryToDecimal(positiveBinaryOffset))
+				} else {
+					snum = int32(binaryToDecimal(binaryOffset))
 				}
 
-				// Calculate the actual offset for display
-				displayOffset := rawOffset
+				return fmt.Sprintf("%s %s\t%d\t%s\t#%d", opcodePart, line[6:], *memCounter, inst.Mnemonic, snum)
 
-				return fmt.Sprintf("%s %s\t%d\t%s\t#%d", opcodePart, line[6:], *memCounter, inst.Mnemonic, displayOffset)
-
+			case "NOP":
+				return fmt.Sprintf("%s\t%d\tNOP", line, *memCounter)
 			case "N/A":
 				return fmt.Sprintf("%s\t%d\tNOP", line, *memCounter)
 			case "BREAK":
@@ -269,4 +312,49 @@ func twosComplement(binStr string) int {
 	num = (1 << len(binStr)) - num
 
 	return -int(num)
+}
+
+func addBinary(a, b string) string {
+	maxLength := max(len(a), len(b))
+	a = padLeft(a, '0', maxLength)
+	b = padLeft(b, '0', maxLength)
+
+	carry := 0
+	result := ""
+	for i := maxLength - 1; i >= 0; i-- {
+		bitA := int(a[i] - '0')
+		bitB := int(b[i] - '0')
+		sum := bitA + bitB + carry
+		result = strconv.Itoa(sum%2) + result
+		carry = sum / 2
+	}
+	if carry > 0 {
+		result = "1" + result
+	}
+	return result
+}
+
+func binaryToDecimal(binaryStr string) int {
+	result := 0
+	length := len(binaryStr)
+	for i, bit := range binaryStr {
+		if bit == '1' {
+			result += 1 << (length - 1 - i)
+		}
+	}
+	return result
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func padLeft(str string, padChar byte, length int) string {
+	for len(str) < length {
+		str = string(padChar) + str
+	}
+	return str
 }
