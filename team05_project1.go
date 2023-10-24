@@ -263,8 +263,24 @@ func defineOpcode(line string, memCounter *int) string {
 	}
 
 	if len(line) == 32 {
-		decInt := twosComplement(line, 64)
-		return fmt.Sprintf("%s"+"\t%d\t%d", line, *memCounter, decInt)
+		binaryData := line        // Assuming the data after "BREAK" is the entire line
+		if binaryData[0] == '1' { // Check if the most significant bit is 1
+			// Convert from two's complement to positive binary number
+			invertedBinaryData := ""
+			for _, bit := range binaryData {
+				if bit == '0' {
+					invertedBinaryData += "1"
+				} else {
+					invertedBinaryData += "0"
+				}
+			}
+			positiveBinaryData := addBinary(invertedBinaryData, "1")
+			decInt := -binaryToDecimal(positiveBinaryData)
+			return fmt.Sprintf("%s\t%d\t%d", line, *memCounter, decInt)
+		} else {
+			decInt := binaryToDecimal(binaryData)
+			return fmt.Sprintf("%s\t%d\t%d", line, *memCounter, decInt)
+		}
 	}
 
 	return fmt.Sprintf("Invalid instruction at address %d", *memCounter)
