@@ -166,8 +166,6 @@ func defineOpcode(line string, memCounter *int) string {
 			case "CB":
 				imm := extractBits(line, 8, 26)
 				rt := extractBits(line, 27, 31)
-				//negBitMask := 0x00200000
-				//extendMask := 0xFFC00000
 				var snum int32
 
 				binaryImm := fmt.Sprintf("%019b", imm) // Convert imm to a 19-bit binary string
@@ -225,8 +223,6 @@ func defineOpcode(line string, memCounter *int) string {
 			case "B":
 				opcodePart := line[:6]
 				rawOffset := extractBits(line, 7, 31)
-				//negBitMask := 0x02000000
-				//extendMask := 0xFC000000
 				var snum int32
 
 				binaryOffset := fmt.Sprintf("%025b", rawOffset) // Convert rawOffset to a 25-bit binary string
@@ -262,6 +258,7 @@ func defineOpcode(line string, memCounter *int) string {
 		return fmt.Sprintf("Unknown instruction with opcode: %s at address %d", opcode, *memCounter)
 	}
 
+	// Data after break
 	if len(line) == 32 {
 		binaryData := line        // Assuming the data after "BREAK" is the entire line
 		if binaryData[0] == '1' { // Check if the most significant bit is 1
