@@ -19,6 +19,13 @@ type Instruction struct {
 	Type     string
 }
 
+// Struct to represent register, memory, and PC data
+type Simulator struct {
+	Registers [32]int32
+	Memory    []int32
+	PC        int32
+}
+
 // Map to associate binary opcodes with their instruction mnemonics and types
 var opcodeMap = map[string]Instruction{
 	// 6-bit opcodes
@@ -94,16 +101,19 @@ func main() {
 	scanner := bufio.NewScanner(openfile)
 	for scanner.Scan() {
 		fullline := scanner.Text()
-		result := defineOpcode(fullline, &memCounter)
+		result, resultRaw := defineOpcode(fullline, &memCounter)
+		//resultSim :=
 		memCounter += 4
-		cycleCounter += 4
+		cycleCounter += 1
 
 		// Write the result to the output file
 		_, err := outFile.WriteString(result + "\n")
 		if err != nil {
 			log.Fatal(err)
 		}
-		_, err = outFileSim.WriteString("====================" + "\n")
+
+		simLine := fmt.Sprintf("====================\n cycle:%d %s \n", cycleCounter, resultRaw)
+		_, err = outFileSim.WriteString(simLine)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -114,7 +124,7 @@ func main() {
 	}
 }
 
-func defineOpcode(line string, memCounter *int) string {
+func defineOpcode(line string, memCounter *int) (string, string) {
 
 	line = strings.ReplaceAll(line, " ", "")
 	var opcode string = ""
@@ -171,9 +181,9 @@ func defineOpcode(line string, memCounter *int) string {
 				switch inst.Mnemonic {
 				case "LSR", "LSL", "ASR":
 					imm := extractBits(line, 16, 21)
-					return fmt.Sprintf("%s %s %s %s %s \t%d \t%s \tR%d, R%d, #%d", line[:11], line[11:16], line[16:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, imm)
+					return fmt.Sprintf("%s %s %s %s %s \t%d \t%s \tR%d, R%d, #%d", line[:11], line[11:16], line[16:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, imm), fmt.Sprintf("\t%d \t%s \tR%d, R%d, #%d", *memCounter, inst.Mnemonic, rd, rn, imm)
 				default:
-					return fmt.Sprintf("%s %s %s %s %s \t%d \t%s \tR%d, R%d, R%d", line[:11], line[11:16], line[16:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, rm)
+					return fmt.Sprintf("%s %s %s %s %s \t%d \t%s \tR%d, R%d, R%d", line[:11], line[11:16], line[16:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, rm), fmt.Sprintf("\t%d \t%s \tR%d, R%d, R%d", *memCounter, inst.Mnemonic, rd, rn, rm)
 				}
 
 			case "CB":
@@ -198,7 +208,7 @@ func defineOpcode(line string, memCounter *int) string {
 					snum = int32(binaryToDecimal(binaryImm))
 				}
 
-				return fmt.Sprintf("%s %s %s  \t%d \t%s \tR%d, #%d", line[:8], line[8:27], line[27:], *memCounter, inst.Mnemonic, rt, snum)
+				return fmt.Sprintf("%s %s %s  \t%d \t%s \tR%d, #%d", line[:8], line[8:27], line[27:], *memCounter, inst.Mnemonic, rt, snum), fmt.Sprintf("\t%d \t%s \tR%d, #%d", *memCounter, inst.Mnemonic, rt, snum)
 
 			case "I":
 				imm := extractBits(line, 10, 21)
@@ -215,7 +225,7 @@ func defineOpcode(line string, memCounter *int) string {
 					simm = simm * -1 // add neg sign
 				}
 
-				return fmt.Sprintf("%s %s %s %s \t%d  \t%s \tR%d, R%d, #%d", line[:10], line[10:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, simm)
+				return fmt.Sprintf("%s %s %s %s \t%d  \t%s \tR%d, R%d, #%d", line[:10], line[10:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, simm), fmt.Sprintf("\t%d  \t%s \tR%d, R%d, #%d", *memCounter, inst.Mnemonic, rd, rn, simm)
 
 			case "IM":
 				immlo := extractBits(line, 9, 10)
@@ -223,16 +233,16 @@ func defineOpcode(line string, memCounter *int) string {
 				rd := extractBits(line, 27, 31)
 				shiftAmount := immlo * 16
 				if inst.Mnemonic == "MOVZ" {
-					return fmt.Sprintf("%s %s %s %s \t%d \t%s \tR%d, %d, LSL %d", line[:9], line[9:11], line[11:27], line[27:], *memCounter, inst.Mnemonic, rd, immhi, shiftAmount)
+					return fmt.Sprintf("%s %s %s %s \t%d \t%s \tR%d, %d, LSL %d", line[:9], line[9:11], line[11:27], line[27:], *memCounter, inst.Mnemonic, rd, immhi, shiftAmount), fmt.Sprintf("\t%d \t%s \tR%d, %d, LSL %d", *memCounter, inst.Mnemonic, rd, immhi, shiftAmount)
 				} else if inst.Mnemonic == "MOVK" {
-					return fmt.Sprintf("%s %s %s %s \t%d \t%s \tR%d, %d, LSL %d", line[:9], line[9:11], line[11:27], line[27:], *memCounter, inst.Mnemonic, rd, immhi, shiftAmount)
+					return fmt.Sprintf("%s %s %s %s \t%d \t%s \tR%d, %d, LSL %d", line[:9], line[9:11], line[11:27], line[27:], *memCounter, inst.Mnemonic, rd, immhi, shiftAmount), fmt.Sprintf("\t%d \t%s \tR%d, %d, LSL %d", *memCounter, inst.Mnemonic, rd, immhi, shiftAmount)
 				}
 
 			case "D":
 				imm := extractBits(line, 11, 19)
 				rn := extractBits(line, 22, 26)
 				rt := extractBits(line, 27, 31)
-				return fmt.Sprintf("%s %s %s %s %s \t%d \t%s \tR%d, [R%d, #%d]", line[:11], line[11:20], line[20:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rt, rn, imm)
+				return fmt.Sprintf("%s %s %s %s %s \t%d \t%s \tR%d, [R%d, #%d]", line[:11], line[11:20], line[20:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rt, rn, imm), fmt.Sprintf("\t%d \t%s \tR%d, [R%d, #%d]", *memCounter, inst.Mnemonic, rt, rn, imm)
 
 			case "B":
 				opcodePart := line[:6]
@@ -256,20 +266,20 @@ func defineOpcode(line string, memCounter *int) string {
 					snum = int32(binaryToDecimal(binaryOffset))
 				}
 
-				return fmt.Sprintf("%s %s   \t%d \t%s   \t#%d", opcodePart, line[6:], *memCounter, inst.Mnemonic, snum)
+				return fmt.Sprintf("%s %s   \t%d \t%s   \t#%d", opcodePart, line[6:], *memCounter, inst.Mnemonic, snum), fmt.Sprintf("\t%d \t%s   \t#%d", *memCounter, inst.Mnemonic, snum)
 
 			case "NOP":
-				return fmt.Sprintf("%s\t%d\tNOP", line, *memCounter)
+				return fmt.Sprintf("%s\t%d\tNOP", line, *memCounter), fmt.Sprintf("%s\t%d\tNOP", line, *memCounter)
 			case "N/A":
-				return fmt.Sprintf("%s \t%d \tNOP", line, *memCounter)
+				return fmt.Sprintf("%s \t%d \tNOP", line, *memCounter), fmt.Sprintf("%s \t%d \tNOP", line, *memCounter)
 			case "BREAK":
-				return fmt.Sprintf("%s %s %s %s %s %s \t%d \t%s", line[:8], line[8:11], line[11:16], line[16:21], line[21:26], line[26:], *memCounter, inst.Mnemonic)
+				return fmt.Sprintf("%s %s %s %s %s %s \t%d \t%s", line[:8], line[8:11], line[11:16], line[16:21], line[21:26], line[26:], *memCounter, inst.Mnemonic), fmt.Sprintf("\t%d \t%s", *memCounter, inst.Mnemonic)
 			}
 
 		}
 	} else {
 
-		return fmt.Sprintf("Unknown instruction with opcode: %s at address %d", opcode, *memCounter)
+		return fmt.Sprintf("Unknown instruction with opcode: %s at address %d", opcode, *memCounter), fmt.Sprintf("Unknown instruction with opcode: %s at address %d", opcode, *memCounter)
 	}
 
 	// Data after break
@@ -287,14 +297,14 @@ func defineOpcode(line string, memCounter *int) string {
 			}
 			positiveBinaryData := addBinary(invertedBinaryData, "1")
 			decInt := -binaryToDecimal(positiveBinaryData)
-			return fmt.Sprintf("%s \t%d \t%d", line, *memCounter, decInt)
+			return fmt.Sprintf("%s \t%d \t%d", line, *memCounter, decInt), fmt.Sprintf("%s \t%d \t%d", line, *memCounter, decInt)
 		} else {
 			decInt := binaryToDecimal(binaryData)
-			return fmt.Sprintf("%s \t%d \t%d", line, *memCounter, decInt)
+			return fmt.Sprintf("%s \t%d \t%d", line, *memCounter, decInt), fmt.Sprintf("%s \t%d \t%d", line, *memCounter, decInt)
 		}
 	}
 
-	return fmt.Sprintf("Invalid instruction at address %d", *memCounter)
+	return fmt.Sprintf("Invalid instruction at address %d", *memCounter), fmt.Sprintf("Invalid instruction at address %d", *memCounter)
 }
 
 func extractBits(line string, start, end int) int {
@@ -385,5 +395,3 @@ func padLeft(str string, padChar byte, length int) string {
 	}
 	return str
 }
-
-// test line
