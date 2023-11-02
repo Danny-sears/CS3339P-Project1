@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"os"
@@ -75,7 +76,12 @@ func main() {
 	}
 
 	memCounter := 96
-	cycleCounter := 1
+	cycleCounter := 0
+	simulator := Simulator{
+		Registers: [32]int32{},
+		Memory:    []int32{},
+		PC:        0,
+	}
 
 	// Open the input file for reading
 	openfile, err := os.Open(*inputFile)
@@ -117,6 +123,9 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		simulator.displayState(outFileSim)
+
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -394,4 +403,22 @@ func padLeft(str string, padChar byte, length int) string {
 		str = string(padChar) + str
 	}
 	return str
+}
+
+func (s *Simulator) displayState(w io.Writer) {
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "registers:\n")
+	// Test to see if data printed correctly with a value
+	s.Registers[5] = 208
+
+	for row := 0; row < 4; row++ {
+		fmt.Fprintf(w, "r%02d:", row*8)
+		for col := 0; col < 8; col++ {
+			fmt.Fprintf(w, "\t%d\t", s.Registers[row*8+col])
+		}
+		fmt.Fprintf(w, "\n")
+	}
+
+	fmt.Fprintln(w)
+
 }
