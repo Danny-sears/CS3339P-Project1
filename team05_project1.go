@@ -107,7 +107,7 @@ func main() {
 	scanner := bufio.NewScanner(openfile)
 	for scanner.Scan() {
 		fullline := scanner.Text()
-		result, resultRaw := defineOpcode(fullline, &memCounter)
+		result, resultRaw := defineOpcode(fullline, &memCounter, &simulator)
 		//resultSim :=
 		memCounter += 4
 		cycleCounter += 1
@@ -133,7 +133,7 @@ func main() {
 	}
 }
 
-func defineOpcode(line string, memCounter *int) (string, string) {
+func defineOpcode(line string, memCounter *int, s *Simulator) (string, string) {
 
 	line = strings.ReplaceAll(line, " ", "")
 	var opcode string = ""
@@ -187,11 +187,13 @@ func defineOpcode(line string, memCounter *int) (string, string) {
 				rm := extractBits(line, 11, 15)
 				rn := extractBits(line, 22, 26)
 				rd := extractBits(line, 27, 31)
+				imm := 0
 				switch inst.Mnemonic {
 				case "LSR", "LSL", "ASR":
-					imm := extractBits(line, 16, 21)
+					imm = extractBits(line, 16, 21)
 					return fmt.Sprintf("%s %s %s %s %s \t%d \t%s \tR%d, R%d, #%d", line[:11], line[11:16], line[16:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, imm), fmt.Sprintf("\t%d \t%s \tR%d, R%d, #%d", *memCounter, inst.Mnemonic, rd, rn, imm)
 				default:
+					s.executeRType(inst.Mnemonic, rm, rn, rd, imm)
 					return fmt.Sprintf("%s %s %s %s %s \t%d \t%s \tR%d, R%d, R%d", line[:11], line[11:16], line[16:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, rm), fmt.Sprintf("\t%d \t%s \tR%d, R%d, R%d", *memCounter, inst.Mnemonic, rd, rn, rm)
 				}
 
@@ -409,7 +411,7 @@ func (s *Simulator) displayState(w io.Writer) {
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "registers:\n")
 	// Test to see if data printed correctly with a value
-	s.Registers[5] = 208
+	//s.Registers[5] = 208
 
 	for row := 0; row < 4; row++ {
 		fmt.Fprintf(w, "r%02d:", row*8)
@@ -421,4 +423,15 @@ func (s *Simulator) displayState(w io.Writer) {
 
 	fmt.Fprintln(w)
 
+}
+
+func (s *Simulator) executeRType(opcode string, rm int, rn int, rd int, imm int) {
+
+	//this line is to test it works correctly given that the registers will always be 0 without I instruction support
+	s.Registers[rm] = 25
+
+	switch opcode {
+	case "ADD":
+		s.Registers[rd] = int32(s.Registers[rm] + s.Registers[rn])
+	}
 }
