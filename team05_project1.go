@@ -433,5 +433,18 @@ func (s *Simulator) executeRType(opcode string, rm int, rn int, rd int, imm int)
 	switch opcode {
 	case "ADD":
 		s.Registers[rd] = int32(s.Registers[rm] + s.Registers[rn])
+	case "SUB":
+		s.Registers[rd] = int32(s.Registers[rn] - s.Registers[rm])
+	case "AND":
+		s.Registers[rd] = int32(s.Registers[rm] & s.Registers[rn])
+	case "ORR":
+		s.Registers[rd] = int32(s.Registers[rm] | s.Registers[rn])
+	case "EOR":
+		s.Registers[rd] = int32(s.Registers[rm] ^ s.Registers[rn])
+		//case "LSL":
+
+		//case "ASR"
+
+		//case "LSR"
 	}
 }
