@@ -23,7 +23,7 @@ type Instruction struct {
 // Struct to represent register, memory, and PC data
 type Simulator struct {
 	Registers [32]int32
-	Memory    []int32
+	Memory    [8]int32
 	PC        int32
 }
 
@@ -79,7 +79,7 @@ func main() {
 	cycleCounter := 0
 	simulator := Simulator{
 		Registers: [32]int32{},
-		Memory:    []int32{},
+		Memory:    [8]int32{},
 		PC:        0,
 	}
 
@@ -109,6 +109,7 @@ func main() {
 		fullline := scanner.Text()
 		result, resultRaw := defineOpcode(fullline, &memCounter, &simulator)
 		//resultSim :=
+		simulator = Simulator{PC: int32(memCounter)}
 		memCounter += 4
 		cycleCounter += 1
 
@@ -420,7 +421,8 @@ func (s *Simulator) displayState(w io.Writer) {
 		}
 		fmt.Fprintf(w, "\n")
 	}
-
+	fmt.Fprintf(w, "\ndata:")
+	fmt.Fprintf(w, "\n%d:\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d", s.PC, s.Memory[0], s.Memory[1], s.Memory[2], s.Memory[3], s.Memory[4], s.Memory[5], s.Memory[6], s.Memory[7])
 	fmt.Fprintln(w)
 
 }
