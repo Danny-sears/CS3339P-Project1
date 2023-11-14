@@ -109,7 +109,7 @@ func main() {
 		fullline := scanner.Text()
 		result, resultRaw := defineOpcode(fullline, &memCounter, &simulator)
 		//resultSim :=
-		simulator = Simulator{PC: int32(memCounter)}
+		simulator.PC = int32(memCounter)
 		memCounter += 4
 		cycleCounter += 1
 
