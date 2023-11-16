@@ -23,7 +23,7 @@ type Instruction struct {
 // Struct to represent register, memory, and PC data
 type Simulator struct {
 	Registers [32]int32
-	Memory    [8]int32
+	Memory    []int32
 	PC        int32
 }
 
@@ -79,7 +79,7 @@ func main() {
 	cycleCounter := 0
 	simulator := Simulator{
 		Registers: [32]int32{},
-		Memory:    [8]int32{},
+		Memory:    []int32{},
 		PC:        0,
 	}
 
@@ -421,9 +421,19 @@ func (s *Simulator) displayState(w io.Writer) {
 		}
 		fmt.Fprintf(w, "\n")
 	}
-	fmt.Fprintf(w, "\ndata:")
-	fmt.Fprintf(w, "\n%d:\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d", s.PC, s.Memory[0], s.Memory[1], s.Memory[2], s.Memory[3], s.Memory[4], s.Memory[5], s.Memory[6], s.Memory[7])
-	fmt.Fprintln(w)
+	fmt.Fprintf(w, "\ndata:\n")
+
+	for i := 0; i < len(s.Memory); i += 8 {
+		fmt.Fprintf(w, "%d:", s.PC) // Print the memory address
+		for j := 0; j < 8; j++ {
+			if i+j < len(s.Memory) {
+				fmt.Fprintf(w, "\t%d", s.Memory[i+j])
+			} else {
+				fmt.Fprintf(w, "\t0") // Pad with zeros if index is out of bounds
+			}
+		}
+		fmt.Fprintln(w)
+	}
 
 }
 
@@ -431,6 +441,8 @@ func (s *Simulator) executeRType(opcode string, rm int, rn int, rd int, imm int)
 
 	//this line is to test it works correctly given that the registers will always be 0 without I instruction support
 	s.Registers[rm] = 25
+	//temporary value to test data output
+	s.Memory = append(s.Memory, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 
 	switch opcode {
 	case "ADD":
