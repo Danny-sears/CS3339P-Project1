@@ -423,8 +423,11 @@ func (s *Simulator) displayState(w io.Writer) {
 	}
 	fmt.Fprintf(w, "\ndata:\n")
 
+	startingAddress := 212
+
 	for i := 0; i < len(s.Memory); i += 8 {
-		fmt.Fprintf(w, "%d:", s.PC) // Print the memory address
+		address := startingAddress + i*4
+		fmt.Fprintf(w, "%d:", address) // Print the memory address
 		for j := 0; j < 8; j++ {
 			if i+j < len(s.Memory) {
 				fmt.Fprintf(w, "\t%d", s.Memory[i+j])
