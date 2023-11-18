@@ -104,11 +104,43 @@ func main() {
 	}
 	defer outFileSim.Close()
 
+	//Find the break instruction
+	var decodedLines []string
+	scanSim := bufio.NewScanner(openfile)
+	for scanSim.Scan() {
+		line := scanSim.Text()
+		decodedLine, _ := defineOpcodeSim(line, &memCounter, &simulator) // Adjust as needed
+		decodedLines = append(decodedLines, decodedLine)
+
+	}
+
+	// Find the index of the BREAK line
+	breakIndex := -1
+	for i, line := range decodedLines {
+		if strings.Contains(line, "BREAK") { // Adjust the condition based on how BREAK is represented
+			breakIndex = i
+			break
+		}
+	}
+
+	if breakIndex == -1 {
+		fmt.Println("BREAK instruction not found in the input file")
+		os.Exit(1)
+	}
+
+	//test to see what breakindex is
+	fmt.Println(breakIndex)
+
+	//reset file pointer to 0
+	_, err = openfile.Seek(0, 0)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	scanner := bufio.NewScanner(openfile)
 	for scanner.Scan() {
 		fullline := scanner.Text()
 		result, resultRaw := defineOpcode(fullline, &memCounter, &simulator)
-		//resultSim :=
 		simulator.PC = int32(memCounter)
 		memCounter += 4
 		cycleCounter += 1
@@ -125,7 +157,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		simulator.displayState(outFileSim)
+		simulator.displayState(outFileSim, breakIndex)
 
 	}
 
@@ -408,7 +440,7 @@ func padLeft(str string, padChar byte, length int) string {
 	return str
 }
 
-func (s *Simulator) displayState(w io.Writer) {
+func (s *Simulator) displayState(w io.Writer, breakI int) {
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "registers:\n")
 	// Test to see if data printed correctly with a value
@@ -423,7 +455,7 @@ func (s *Simulator) displayState(w io.Writer) {
 	}
 	fmt.Fprintf(w, "\ndata:\n")
 
-	startingAddress := 212
+	startingAddress := 96 + breakI*4
 
 	for i := 0; i < len(s.Memory); i += 8 {
 		address := startingAddress + i*4
@@ -464,4 +496,188 @@ func (s *Simulator) executeRType(opcode string, rm int, rn int, rd int, imm int)
 
 		//case "LSR"
 	}
+}
+
+func defineOpcodeSim(line string, memCounter *int, s *Simulator) (string, string) {
+
+	line = strings.ReplaceAll(line, " ", "")
+	var opcode string = ""
+	var exists bool
+	var inst Instruction
+
+	// Ensure the line is long enough to contain the opcode
+	if len(line) >= 6 { // Minimum opcode size is 6
+
+		if len(line) >= 32 {
+			opcode = line[:32]
+			inst, exists = opcodeMap[opcode]
+		}
+
+		// Check for 11-bit opcode
+		if !exists && len(line) >= 11 {
+			opcode = line[:11]
+			inst, exists = opcodeMap[opcode]
+		}
+
+		// If not found, check for 10-bit opcode
+		if !exists && len(line) >= 10 {
+			opcode = line[:10]
+			inst, exists = opcodeMap[opcode]
+		}
+
+		// If not found, check for 9-bit opcode
+		if !exists && len(line) >= 9 {
+			opcode = line[:9]
+			inst, exists = opcodeMap[opcode]
+		}
+
+		// If not found, check for 8-bit opcode
+		if !exists && len(line) >= 8 {
+			opcode = line[:8]
+			inst, exists = opcodeMap[opcode]
+		}
+
+		// If not found, check for 6-bit opcode
+		if !exists && len(line) >= 6 {
+			opcode = line[:6]
+			inst, exists = opcodeMap[opcode]
+		}
+
+		// Check if the opcode exists in the opcodeMap
+		if exists {
+			// Determine the type of instruction and extract relevant bits
+			switch inst.Type {
+
+			case "R":
+				rm := extractBits(line, 11, 15)
+				rn := extractBits(line, 22, 26)
+				rd := extractBits(line, 27, 31)
+				imm := 0
+				switch inst.Mnemonic {
+				case "LSR", "LSL", "ASR":
+					imm = extractBits(line, 16, 21)
+					return fmt.Sprintf("%s %s %s %s %s \t%d \t%s \tR%d, R%d, #%d", line[:11], line[11:16], line[16:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, imm), fmt.Sprintf("\t%d \t%s \tR%d, R%d, #%d", *memCounter, inst.Mnemonic, rd, rn, imm)
+				default:
+					return fmt.Sprintf("%s %s %s %s %s \t%d \t%s \tR%d, R%d, R%d", line[:11], line[11:16], line[16:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, rm), fmt.Sprintf("\t%d \t%s \tR%d, R%d, R%d", *memCounter, inst.Mnemonic, rd, rn, rm)
+				}
+
+			case "CB":
+				imm := extractBits(line, 8, 26)
+				rt := extractBits(line, 27, 31)
+				var snum int32
+
+				binaryImm := fmt.Sprintf("%019b", imm) // Convert imm to a 19-bit binary string
+				if binaryImm[0] == '1' {               // Check if the most significant bit is 1
+					// Convert from two's complement to positive binary number
+					invertedBinaryImm := ""
+					for _, bit := range binaryImm {
+						if bit == '0' {
+							invertedBinaryImm += "1"
+						} else {
+							invertedBinaryImm += "0"
+						}
+					}
+					positiveBinaryImm := addBinary(invertedBinaryImm, "1")
+					snum = -int32(binaryToDecimal(positiveBinaryImm))
+				} else {
+					snum = int32(binaryToDecimal(binaryImm))
+				}
+
+				return fmt.Sprintf("%s %s %s  \t%d \t%s \tR%d, #%d", line[:8], line[8:27], line[27:], *memCounter, inst.Mnemonic, rt, snum), fmt.Sprintf("\t%d \t%s \tR%d, #%d", *memCounter, inst.Mnemonic, rt, snum)
+
+			case "I":
+				imm := extractBits(line, 10, 21)
+				rn := extractBits(line, 22, 26)
+				rd := extractBits(line, 27, 31)
+				negBitMask := 0x800 // figure out if 12 bit num is neg
+				extendMask := 0xFFFFF000
+				var simm int32
+				simm = int32(imm)
+				if (negBitMask & imm) > 0 { // is it?
+					imm = imm | extendMask // if so extend with 1's
+					imm = imm ^ 0xFFFFFFFF // 2s comp
+					simm = int32(imm + 1)
+					simm = simm * -1 // add neg sign
+				}
+
+				return fmt.Sprintf("%s %s %s %s \t%d  \t%s \tR%d, R%d, #%d", line[:10], line[10:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, simm), fmt.Sprintf("\t%d  \t%s \tR%d, R%d, #%d", *memCounter, inst.Mnemonic, rd, rn, simm)
+
+			case "IM":
+				immlo := extractBits(line, 9, 10)
+				immhi := extractBits(line, 11, 26)
+				rd := extractBits(line, 27, 31)
+				shiftAmount := immlo * 16
+				if inst.Mnemonic == "MOVZ" {
+					return fmt.Sprintf("%s %s %s %s \t%d \t%s \tR%d, %d, LSL %d", line[:9], line[9:11], line[11:27], line[27:], *memCounter, inst.Mnemonic, rd, immhi, shiftAmount), fmt.Sprintf("\t%d \t%s \tR%d, %d, LSL %d", *memCounter, inst.Mnemonic, rd, immhi, shiftAmount)
+				} else if inst.Mnemonic == "MOVK" {
+					return fmt.Sprintf("%s %s %s %s \t%d \t%s \tR%d, %d, LSL %d", line[:9], line[9:11], line[11:27], line[27:], *memCounter, inst.Mnemonic, rd, immhi, shiftAmount), fmt.Sprintf("\t%d \t%s \tR%d, %d, LSL %d", *memCounter, inst.Mnemonic, rd, immhi, shiftAmount)
+				}
+
+			case "D":
+				imm := extractBits(line, 11, 19)
+				rn := extractBits(line, 22, 26)
+				rt := extractBits(line, 27, 31)
+				return fmt.Sprintf("%s %s %s %s %s \t%d \t%s \tR%d, [R%d, #%d]", line[:11], line[11:20], line[20:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rt, rn, imm), fmt.Sprintf("\t%d \t%s \tR%d, [R%d, #%d]", *memCounter, inst.Mnemonic, rt, rn, imm)
+
+			case "B":
+				opcodePart := line[:6]
+				rawOffset := extractBits(line, 7, 31)
+				var snum int32
+
+				binaryOffset := fmt.Sprintf("%025b", rawOffset) // Convert rawOffset to a 25-bit binary string
+				if binaryOffset[0] == '1' {                     // Check if the most significant bit is 1
+					// Convert from two's complement to positive binary number
+					invertedBinaryOffset := ""
+					for _, bit := range binaryOffset {
+						if bit == '0' {
+							invertedBinaryOffset += "1"
+						} else {
+							invertedBinaryOffset += "0"
+						}
+					}
+					positiveBinaryOffset := addBinary(invertedBinaryOffset, "1")
+					snum = -int32(binaryToDecimal(positiveBinaryOffset))
+				} else {
+					snum = int32(binaryToDecimal(binaryOffset))
+				}
+
+				return fmt.Sprintf("%s %s   \t%d \t%s   \t#%d", opcodePart, line[6:], *memCounter, inst.Mnemonic, snum), fmt.Sprintf("\t%d \t%s   \t#%d", *memCounter, inst.Mnemonic, snum)
+
+			case "NOP":
+				return fmt.Sprintf("%s\t%d\tNOP", line, *memCounter), fmt.Sprintf("%s\t%d\tNOP", line, *memCounter)
+			case "N/A":
+				return fmt.Sprintf("%s \t%d \tNOP", line, *memCounter), fmt.Sprintf("%s \t%d \tNOP", line, *memCounter)
+			case "BREAK":
+				return fmt.Sprintf("%s %s %s %s %s %s \t%d \t%s", line[:8], line[8:11], line[11:16], line[16:21], line[21:26], line[26:], *memCounter, inst.Mnemonic), fmt.Sprintf("\t%d \t%s", *memCounter, inst.Mnemonic)
+			}
+
+		}
+	} else {
+
+		return fmt.Sprintf("Unknown instruction with opcode: %s at address %d", opcode, *memCounter), fmt.Sprintf("Unknown instruction with opcode: %s at address %d", opcode, *memCounter)
+	}
+
+	// Data after break
+	if len(line) == 32 {
+		binaryData := line        // Assuming the data after "BREAK" is the entire line
+		if binaryData[0] == '1' { // Check if the most significant bit is 1
+			// Convert from two's complement to positive binary number
+			invertedBinaryData := ""
+			for _, bit := range binaryData {
+				if bit == '0' {
+					invertedBinaryData += "1"
+				} else {
+					invertedBinaryData += "0"
+				}
+			}
+			positiveBinaryData := addBinary(invertedBinaryData, "1")
+			decInt := -binaryToDecimal(positiveBinaryData)
+			return fmt.Sprintf("%s \t%d \t%d", line, *memCounter, decInt), fmt.Sprintf("%s \t%d \t%d", line, *memCounter, decInt)
+		} else {
+			decInt := binaryToDecimal(binaryData)
+			return fmt.Sprintf("%s \t%d \t%d", line, *memCounter, decInt), fmt.Sprintf("%s \t%d \t%d", line, *memCounter, decInt)
+		}
+	}
+
+	return fmt.Sprintf("Invalid instruction at address %d", *memCounter), fmt.Sprintf("Invalid instruction at address %d", *memCounter)
 }
