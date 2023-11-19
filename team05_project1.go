@@ -131,6 +131,20 @@ func main() {
 	//test to see what breakindex is
 	fmt.Println(breakIndex)
 
+	// Step 4: Process data after BREAK, if any
+	for i := breakIndex + 1; i < len(decodedLines); i++ {
+		lineParts := strings.Split(decodedLines[i], "\t") // Split the line at the tab character
+		if len(lineParts) < 1 {
+			log.Fatalf("Invalid data line format: '%s'", decodedLines[i])
+		}
+		binaryData := strings.TrimSpace(lineParts[0])          // Trim any leading/trailing whitespace
+		dataValue, err := strconv.ParseUint(binaryData, 2, 32) // Parse as unsigned 32-bit integer
+		if err != nil {
+			log.Fatalf("Error parsing data line '%s': %v", binaryData, err)
+		}
+		simulator.Memory = append(simulator.Memory, int32(dataValue)) // Convert to signed 32-bit integer
+	}
+
 	//reset file pointer to 0
 	_, err = openfile.Seek(0, 0)
 	if err != nil {
@@ -157,7 +171,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		simulator.displayState(outFileSim, breakIndex)
+		simulator.displayState(outFileSim, breakIndex+1)
 
 	}
 
@@ -443,8 +457,6 @@ func padLeft(str string, padChar byte, length int) string {
 func (s *Simulator) displayState(w io.Writer, breakI int) {
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "registers:\n")
-	// Test to see if data printed correctly with a value
-	//s.Registers[5] = 208
 
 	for row := 0; row < 4; row++ {
 		fmt.Fprintf(w, "r%02d:", row*8)
