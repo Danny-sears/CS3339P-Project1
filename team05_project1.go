@@ -502,7 +502,8 @@ func (s *Simulator) executeRType(opcode string, rm int, rn int, rd int, imm int)
 		s.Registers[rd] = int32(s.Registers[rm] | s.Registers[rn])
 	case "EOR":
 		s.Registers[rd] = int32(s.Registers[rm] ^ s.Registers[rn])
-		//case "LSL":
+	case "LSL":
+		s.Registers[rd] = int32(s.Registers[rn] << int32(imm))
 
 		//case "ASR"
 
