@@ -128,10 +128,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	//test to see what breakindex is
-	fmt.Println(breakIndex)
-
-	// Step 4: Process data after BREAK, if any
+	//Process data after BREAK, if any
 	for i := breakIndex + 1; i < len(decodedLines); i++ {
 		lineParts := strings.Split(decodedLines[i], "\t") // Split the line at the tab character
 		if len(lineParts) < 1 {
@@ -142,7 +139,18 @@ func main() {
 		if err != nil {
 			log.Fatalf("Error parsing data line '%s': %v", binaryData, err)
 		}
-		simulator.Memory = append(simulator.Memory, int32(dataValue)) // Convert to signed 32-bit integer
+
+		// Calculate the memory address
+		memoryAddress := 96 + ((breakIndex + 1) * 4) + (i-(breakIndex+1))*4
+
+		// Ensure memory is initialized up to this point
+		if memoryAddress >= len(simulator.Memory) {
+			// Initialize memory up to this point
+			simulator.Memory = append(simulator.Memory, make([]int32, memoryAddress-len(simulator.Memory)+1)...)
+		}
+
+		// Insert the data
+		simulator.Memory[memoryAddress] = int32(dataValue)
 	}
 
 	//reset file pointer to 0
@@ -238,6 +246,7 @@ func defineOpcode(line string, memCounter *int, s *Simulator) (string, string) {
 				switch inst.Mnemonic {
 				case "LSR", "LSL", "ASR":
 					imm = extractBits(line, 16, 21)
+					s.executeRType(inst.Mnemonic, rm, rn, rd, imm)
 					return fmt.Sprintf("%s %s %s %s %s \t%d \t%s \tR%d, R%d, #%d", line[:11], line[11:16], line[16:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, imm), fmt.Sprintf("\t%d \t%s \tR%d, R%d, #%d", *memCounter, inst.Mnemonic, rd, rn, imm)
 				default:
 					s.executeRType(inst.Mnemonic, rm, rn, rd, imm)
@@ -266,6 +275,7 @@ func defineOpcode(line string, memCounter *int, s *Simulator) (string, string) {
 					snum = int32(binaryToDecimal(binaryImm))
 				}
 
+				s.executeCBType(inst.Mnemonic, rt, int(snum))
 				return fmt.Sprintf("%s %s %s  \t%d \t%s \tR%d, #%d", line[:8], line[8:27], line[27:], *memCounter, inst.Mnemonic, rt, snum), fmt.Sprintf("\t%d \t%s \tR%d, #%d", *memCounter, inst.Mnemonic, rt, snum)
 
 			case "I":
@@ -283,6 +293,7 @@ func defineOpcode(line string, memCounter *int, s *Simulator) (string, string) {
 					simm = simm * -1 // add neg sign
 				}
 
+				s.executeIType(rn, rd, int(simm))
 				return fmt.Sprintf("%s %s %s %s \t%d  \t%s \tR%d, R%d, #%d", line[:10], line[10:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, simm), fmt.Sprintf("\t%d  \t%s \tR%d, R%d, #%d", *memCounter, inst.Mnemonic, rd, rn, simm)
 
 			case "IM":
@@ -290,6 +301,7 @@ func defineOpcode(line string, memCounter *int, s *Simulator) (string, string) {
 				immhi := extractBits(line, 11, 26)
 				rd := extractBits(line, 27, 31)
 				shiftAmount := immlo * 16
+				s.executeIMType(rd, immhi, shiftAmount)
 				if inst.Mnemonic == "MOVZ" {
 					return fmt.Sprintf("%s %s %s %s \t%d \t%s \tR%d, %d, LSL %d", line[:9], line[9:11], line[11:27], line[27:], *memCounter, inst.Mnemonic, rd, immhi, shiftAmount), fmt.Sprintf("\t%d \t%s \tR%d, %d, LSL %d", *memCounter, inst.Mnemonic, rd, immhi, shiftAmount)
 				} else if inst.Mnemonic == "MOVK" {
@@ -300,6 +312,7 @@ func defineOpcode(line string, memCounter *int, s *Simulator) (string, string) {
 				imm := extractBits(line, 11, 19)
 				rn := extractBits(line, 22, 26)
 				rt := extractBits(line, 27, 31)
+				s.executeDType(inst.Mnemonic, imm, rn, rt)
 				return fmt.Sprintf("%s %s %s %s %s \t%d \t%s \tR%d, [R%d, #%d]", line[:11], line[11:20], line[20:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rt, rn, imm), fmt.Sprintf("\t%d \t%s \tR%d, [R%d, #%d]", *memCounter, inst.Mnemonic, rt, rn, imm)
 
 			case "B":
@@ -323,6 +336,8 @@ func defineOpcode(line string, memCounter *int, s *Simulator) (string, string) {
 				} else {
 					snum = int32(binaryToDecimal(binaryOffset))
 				}
+
+				s.executeBType(int(snum))
 
 				return fmt.Sprintf("%s %s   \t%d \t%s   \t#%d", opcodePart, line[6:], *memCounter, inst.Mnemonic, snum), fmt.Sprintf("\t%d \t%s   \t#%d", *memCounter, inst.Mnemonic, snum)
 
@@ -468,13 +483,15 @@ func (s *Simulator) displayState(w io.Writer, breakI int) {
 	fmt.Fprintf(w, "\ndata:\n")
 
 	startingAddress := 96 + breakI*4
+	memoryOffset := startingAddress // Since your addresses directly map to indices
 
-	for i := 0; i < len(s.Memory); i += 8 {
-		address := startingAddress + i*4
+	for i := 0; i < len(s.Memory)-memoryOffset; i += 8 {
+		address := startingAddress + i // Address increments by 8 each loop iteration
 		fmt.Fprintf(w, "%d:", address) // Print the memory address
 		for j := 0; j < 8; j++ {
-			if i+j < len(s.Memory) {
-				fmt.Fprintf(w, "\t%d", s.Memory[i+j])
+			arrayIndex := memoryOffset + i + j
+			if arrayIndex < len(s.Memory) {
+				fmt.Fprintf(w, "\t%d", s.Memory[arrayIndex])
 			} else {
 				fmt.Fprintf(w, "\t0") // Pad with zeros if index is out of bounds
 			}
@@ -487,9 +504,9 @@ func (s *Simulator) displayState(w io.Writer, breakI int) {
 func (s *Simulator) executeRType(opcode string, rm int, rn int, rd int, imm int) {
 
 	//this line is to test it works correctly given that the registers will always be 0 without I instruction support
-	s.Registers[rm] = 25
+	//s.Registers[rm] = 25
 	//temporary value to test data output
-	s.Memory = append(s.Memory, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+	//s.Memory = append(s.Memory, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 
 	switch opcode {
 	case "ADD":
@@ -504,11 +521,66 @@ func (s *Simulator) executeRType(opcode string, rm int, rn int, rd int, imm int)
 		s.Registers[rd] = int32(s.Registers[rm] ^ s.Registers[rn])
 	case "LSL":
 		s.Registers[rd] = int32(s.Registers[rn] << int32(imm))
-
-		//case "ASR"
-
-		//case "LSR"
+	case "ASR":
+		s.Registers[rd] = int32(uint32(s.Registers[rn]) >> uint32(imm))
+	case "LSR":
+		s.Registers[rd] = int32(uint32(s.Registers[rn]) >> uint32(imm))
 	}
+}
+
+func (s *Simulator) executeDType(opcode string, address, rn int, rt int) {
+	s.ensureMemoryInitialized(rn + address)
+	switch opcode {
+	case "LDUR":
+		// Load from memory: Rt = M[Rn + address]
+		s.Registers[rt] = s.Memory[int(s.Registers[rn])+address*4]
+	case "STUR":
+
+		memoryAddress := (int(s.Registers[rn]) + address*4)
+
+		// Ensure memory is large enough
+		if memoryAddress >= len(s.Memory) {
+			// Resize memory slice to accommodate new address
+			newMemory := make([]int32, memoryAddress+8) // +8 to pad with zeros
+			copy(newMemory, s.Memory)
+			s.Memory = newMemory
+		}
+
+		// Store the value in memory
+		s.Memory[memoryAddress] = s.Registers[rt]
+	}
+}
+
+func (s *Simulator) executeIType(rn int, rd int, immediate int) {
+
+	// Add immediate: Rd = Rn + immediate
+	s.Registers[rd] = s.Registers[rn] + int32(immediate)
+
+}
+
+func (s *Simulator) executeCBType(opcode string, rn int, offset int) {
+	switch opcode {
+	case "CBZ":
+		// Branch if zero
+		if s.Registers[rn] == 0 {
+			s.PC += int32(offset)
+		}
+	case "CBNZ":
+		// Branch if not zero
+		if s.Registers[rn] != 0 {
+			s.PC += int32(offset)
+		}
+	}
+}
+
+func (s *Simulator) executeIMType(rd int, value int, shift int) {
+	// Move value into Rd with shift
+	s.Registers[rd] = int32(value) << uint32(shift)
+}
+
+func (s *Simulator) executeBType(offset int) {
+	// Branch to offset
+	s.PC += int32(offset)
 }
 
 func defineOpcodeSim(line string, memCounter *int, s *Simulator) (string, string) {
@@ -693,4 +765,18 @@ func defineOpcodeSim(line string, memCounter *int, s *Simulator) (string, string
 	}
 
 	return fmt.Sprintf("Invalid instruction at address %d", *memCounter), fmt.Sprintf("Invalid instruction at address %d", *memCounter)
+}
+
+func (s *Simulator) ensureMemoryInitialized(upToIndex int) {
+	// Check if the memory slice is shorter than the required length
+	if len(s.Memory) < upToIndex+1 {
+		// Calculate the number of elements to append
+		elementsToAdd := upToIndex + 1 - len(s.Memory)
+
+		// Create a slice of zeros to append
+		zeros := make([]int32, elementsToAdd)
+
+		// Append the zeros to the memory slice
+		s.Memory = append(s.Memory, zeros...)
+	}
 }
