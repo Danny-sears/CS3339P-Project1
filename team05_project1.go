@@ -163,24 +163,30 @@ func main() {
 	for scanner.Scan() {
 		fullline := scanner.Text()
 		result, resultRaw := defineOpcode(fullline, &memCounter, &simulator)
-		simulator.PC = int32(memCounter)
-		memCounter += 4
-		cycleCounter += 1
 
-		// Write the result to the output file
+		// Write the result to the disassembler output file for both instructions and data
 		_, err := outFile.WriteString(result + "\n")
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		simLine := fmt.Sprintf("====================\n cycle:%d %s \n", cycleCounter, resultRaw)
-		_, err = outFileSim.WriteString(simLine)
-		if err != nil {
-			log.Fatal(err)
+		// Check if the current line is before the BREAK instruction
+		if memCounter <= 96+breakIndex*4 {
+			simulator.PC = int32(memCounter)
+			cycleCounter += 1
+
+			// Write the simulator state to the simulator output file
+			simLine := fmt.Sprintf("====================\n cycle:%d %s \n", cycleCounter, resultRaw)
+			_, err = outFileSim.WriteString(simLine)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			simulator.displayState(outFileSim, breakIndex+1)
 		}
 
-		simulator.displayState(outFileSim, breakIndex+1)
-
+		// Increment the memory counter
+		memCounter += 4
 	}
 
 	if err := scanner.Err(); err != nil {
