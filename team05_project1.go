@@ -76,6 +76,7 @@ func main() {
 	}
 
 	memCounter := 96
+	simMem := 96
 	cycleCounter := 0
 	simulator := Simulator{
 		Registers: [32]int32{},
@@ -162,7 +163,7 @@ func main() {
 	scanner := bufio.NewScanner(openfile)
 	for scanner.Scan() {
 		fullline := scanner.Text()
-		result, resultRaw := defineOpcode(fullline, &memCounter, &simulator)
+		result, resultRaw := defineOpcode(fullline, &memCounter, &simulator, &simMem)
 
 		// Write the result to the disassembler output file for both instructions and data
 		_, err := outFile.WriteString(result + "\n")
@@ -187,6 +188,7 @@ func main() {
 
 		// Increment the memory counter
 		memCounter += 4
+		simMem += 4
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -194,7 +196,7 @@ func main() {
 	}
 }
 
-func defineOpcode(line string, memCounter *int, s *Simulator) (string, string) {
+func defineOpcode(line string, memCounter *int, s *Simulator, simMem *int) (string, string) {
 
 	line = strings.ReplaceAll(line, " ", "")
 	var opcode string = ""
@@ -253,10 +255,10 @@ func defineOpcode(line string, memCounter *int, s *Simulator) (string, string) {
 				case "LSR", "LSL", "ASR":
 					imm = extractBits(line, 16, 21)
 					s.executeRType(inst.Mnemonic, rm, rn, rd, imm)
-					return fmt.Sprintf("%s %s %s %s %s \t%d \t%s \tR%d, R%d, #%d", line[:11], line[11:16], line[16:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, imm), fmt.Sprintf("\t%d \t%s \tR%d, R%d, #%d", *memCounter, inst.Mnemonic, rd, rn, imm)
+					return fmt.Sprintf("%s %s %s %s %s \t%d \t%s \tR%d, R%d, #%d", line[:11], line[11:16], line[16:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, imm), fmt.Sprintf("\t%d \t%s \tR%d, R%d, #%d", *simMem, inst.Mnemonic, rd, rn, imm)
 				default:
 					s.executeRType(inst.Mnemonic, rm, rn, rd, imm)
-					return fmt.Sprintf("%s %s %s %s %s \t%d \t%s \tR%d, R%d, R%d", line[:11], line[11:16], line[16:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, rm), fmt.Sprintf("\t%d \t%s \tR%d, R%d, R%d", *memCounter, inst.Mnemonic, rd, rn, rm)
+					return fmt.Sprintf("%s %s %s %s %s \t%d \t%s \tR%d, R%d, R%d", line[:11], line[11:16], line[16:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, rm), fmt.Sprintf("\t%d \t%s \tR%d, R%d, R%d", *simMem, inst.Mnemonic, rd, rn, rm)
 				}
 
 			case "CB":
@@ -282,7 +284,7 @@ func defineOpcode(line string, memCounter *int, s *Simulator) (string, string) {
 				}
 
 				s.executeCBType(inst.Mnemonic, rt, int(snum))
-				return fmt.Sprintf("%s %s %s  \t%d \t%s \tR%d, #%d", line[:8], line[8:27], line[27:], *memCounter, inst.Mnemonic, rt, snum), fmt.Sprintf("\t%d \t%s \tR%d, #%d", *memCounter, inst.Mnemonic, rt, snum)
+				return fmt.Sprintf("%s %s %s  \t%d \t%s \tR%d, #%d", line[:8], line[8:27], line[27:], *memCounter, inst.Mnemonic, rt, snum), fmt.Sprintf("\t%d \t%s \tR%d, #%d", *simMem, inst.Mnemonic, rt, snum)
 
 			case "I":
 				imm := extractBits(line, 10, 21)
@@ -300,7 +302,7 @@ func defineOpcode(line string, memCounter *int, s *Simulator) (string, string) {
 				}
 
 				s.executeIType(inst.Mnemonic, rn, rd, int(simm))
-				return fmt.Sprintf("%s %s %s %s \t%d  \t%s \tR%d, R%d, #%d", line[:10], line[10:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, simm), fmt.Sprintf("\t%d  \t%s \tR%d, R%d, #%d", *memCounter, inst.Mnemonic, rd, rn, simm)
+				return fmt.Sprintf("%s %s %s %s \t%d  \t%s \tR%d, R%d, #%d", line[:10], line[10:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, simm), fmt.Sprintf("\t%d  \t%s \tR%d, R%d, #%d", *simMem, inst.Mnemonic, rd, rn, simm)
 
 			case "IM":
 				immlo := extractBits(line, 9, 10)
@@ -309,9 +311,9 @@ func defineOpcode(line string, memCounter *int, s *Simulator) (string, string) {
 				shiftAmount := immlo * 16
 				s.executeIMType(rd, immhi, shiftAmount)
 				if inst.Mnemonic == "MOVZ" {
-					return fmt.Sprintf("%s %s %s %s \t%d \t%s \tR%d, %d, LSL %d", line[:9], line[9:11], line[11:27], line[27:], *memCounter, inst.Mnemonic, rd, immhi, shiftAmount), fmt.Sprintf("\t%d \t%s \tR%d, %d, LSL %d", *memCounter, inst.Mnemonic, rd, immhi, shiftAmount)
+					return fmt.Sprintf("%s %s %s %s \t%d \t%s \tR%d, %d, LSL %d", line[:9], line[9:11], line[11:27], line[27:], *memCounter, inst.Mnemonic, rd, immhi, shiftAmount), fmt.Sprintf("\t%d \t%s \tR%d, %d, LSL %d", *simMem, inst.Mnemonic, rd, immhi, shiftAmount)
 				} else if inst.Mnemonic == "MOVK" {
-					return fmt.Sprintf("%s %s %s %s \t%d \t%s \tR%d, %d, LSL %d", line[:9], line[9:11], line[11:27], line[27:], *memCounter, inst.Mnemonic, rd, immhi, shiftAmount), fmt.Sprintf("\t%d \t%s \tR%d, %d, LSL %d", *memCounter, inst.Mnemonic, rd, immhi, shiftAmount)
+					return fmt.Sprintf("%s %s %s %s \t%d \t%s \tR%d, %d, LSL %d", line[:9], line[9:11], line[11:27], line[27:], *memCounter, inst.Mnemonic, rd, immhi, shiftAmount), fmt.Sprintf("\t%d \t%s \tR%d, %d, LSL %d", *simMem, inst.Mnemonic, rd, immhi, shiftAmount)
 				}
 
 			case "D":
@@ -319,7 +321,7 @@ func defineOpcode(line string, memCounter *int, s *Simulator) (string, string) {
 				rn := extractBits(line, 22, 26)
 				rt := extractBits(line, 27, 31)
 				s.executeDType(inst.Mnemonic, imm, rn, rt)
-				return fmt.Sprintf("%s %s %s %s %s \t%d \t%s \tR%d, [R%d, #%d]", line[:11], line[11:20], line[20:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rt, rn, imm), fmt.Sprintf("\t%d \t%s \tR%d, [R%d, #%d]", *memCounter, inst.Mnemonic, rt, rn, imm)
+				return fmt.Sprintf("%s %s %s %s %s \t%d \t%s \tR%d, [R%d, #%d]", line[:11], line[11:20], line[20:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rt, rn, imm), fmt.Sprintf("\t%d \t%s \tR%d, [R%d, #%d]", *simMem, inst.Mnemonic, rt, rn, imm)
 
 			case "B":
 				opcodePart := line[:6]
@@ -345,20 +347,24 @@ func defineOpcode(line string, memCounter *int, s *Simulator) (string, string) {
 
 				s.executeBType(int(snum))
 
-				return fmt.Sprintf("%s %s   \t%d \t%s   \t#%d", opcodePart, line[6:], *memCounter, inst.Mnemonic, snum), fmt.Sprintf("\t%d \t%s   \t#%d", *memCounter, inst.Mnemonic, snum)
+				prevMem := 0
+				prevMem += *simMem
+				*simMem += int(snum * 4)
+
+				return fmt.Sprintf("%s %s   \t%d \t%s   \t#%d", opcodePart, line[6:], *memCounter, inst.Mnemonic, snum), fmt.Sprintf("\t%d \t%s   \t#%d", prevMem, inst.Mnemonic, snum)
 
 			case "NOP":
 				return fmt.Sprintf("%s\t%d\tNOP", line, *memCounter), fmt.Sprintf("%s\t%d\tNOP", line, *memCounter)
 			case "N/A":
 				return fmt.Sprintf("%s \t%d \tNOP", line, *memCounter), fmt.Sprintf("%s \t%d \tNOP", line, *memCounter)
 			case "BREAK":
-				return fmt.Sprintf("%s %s %s %s %s %s \t%d \t%s", line[:8], line[8:11], line[11:16], line[16:21], line[21:26], line[26:], *memCounter, inst.Mnemonic), fmt.Sprintf("\t%d \t%s", *memCounter, inst.Mnemonic)
+				return fmt.Sprintf("%s %s %s %s %s %s \t%d \t%s", line[:8], line[8:11], line[11:16], line[16:21], line[21:26], line[26:], *memCounter, inst.Mnemonic), fmt.Sprintf("\t%d \t%s", *simMem, inst.Mnemonic)
 			}
 
 		}
 	} else {
 
-		return fmt.Sprintf("Unknown instruction with opcode: %s at address %d", opcode, *memCounter), fmt.Sprintf("Unknown instruction with opcode: %s at address %d", opcode, *memCounter)
+		return fmt.Sprintf("Unknown instruction with opcode: %s at address %d", opcode, *memCounter), fmt.Sprintf("Unknown instruction with opcode: %s at address %d", opcode, *simMem)
 	}
 
 	// Data after break
@@ -376,14 +382,14 @@ func defineOpcode(line string, memCounter *int, s *Simulator) (string, string) {
 			}
 			positiveBinaryData := addBinary(invertedBinaryData, "1")
 			decInt := -binaryToDecimal(positiveBinaryData)
-			return fmt.Sprintf("%s \t%d \t%d", line, *memCounter, decInt), fmt.Sprintf("%s \t%d \t%d", line, *memCounter, decInt)
+			return fmt.Sprintf("%s \t%d \t%d", line, *memCounter, decInt), fmt.Sprintf("%s \t%d \t%d", line, *simMem, decInt)
 		} else {
 			decInt := binaryToDecimal(binaryData)
-			return fmt.Sprintf("%s \t%d \t%d", line, *memCounter, decInt), fmt.Sprintf("%s \t%d \t%d", line, *memCounter, decInt)
+			return fmt.Sprintf("%s \t%d \t%d", line, *memCounter, decInt), fmt.Sprintf("%s \t%d \t%d", line, *simMem, decInt)
 		}
 	}
 
-	return fmt.Sprintf("Invalid instruction at address %d", *memCounter), fmt.Sprintf("Invalid instruction at address %d", *memCounter)
+	return fmt.Sprintf("Invalid instruction at address %d", *memCounter), fmt.Sprintf("Invalid instruction at address %d", *simMem)
 }
 
 func extractBits(line string, start, end int) int {
