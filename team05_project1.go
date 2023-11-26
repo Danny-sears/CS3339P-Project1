@@ -299,7 +299,7 @@ func defineOpcode(line string, memCounter *int, s *Simulator) (string, string) {
 					simm = simm * -1 // add neg sign
 				}
 
-				s.executeIType(rn, rd, int(simm))
+				s.executeIType(inst.Mnemonic, rn, rd, int(simm))
 				return fmt.Sprintf("%s %s %s %s \t%d  \t%s \tR%d, R%d, #%d", line[:10], line[10:22], line[22:27], line[27:], *memCounter, inst.Mnemonic, rd, rn, simm), fmt.Sprintf("\t%d  \t%s \tR%d, R%d, #%d", *memCounter, inst.Mnemonic, rd, rn, simm)
 
 			case "IM":
@@ -557,11 +557,15 @@ func (s *Simulator) executeDType(opcode string, address, rn int, rt int) {
 	}
 }
 
-func (s *Simulator) executeIType(rn int, rd int, immediate int) {
+func (s *Simulator) executeIType(opcode string, rn int, rd int, immediate int) {
 
 	// Add immediate: Rd = Rn + immediate
-	s.Registers[rd] = s.Registers[rn] + int32(immediate)
-
+	switch opcode {
+	case "ADDI":
+		s.Registers[rd] = s.Registers[rn] + int32(immediate)
+	case "SUBI":
+		s.Registers[rd] = s.Registers[rn] - int32(immediate)
+	}
 }
 
 func (s *Simulator) executeCBType(opcode string, rn int, offset int) {
