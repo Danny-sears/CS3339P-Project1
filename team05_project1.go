@@ -282,9 +282,17 @@ func defineOpcode(line string, memCounter *int, s *Simulator, simMem *int) (stri
 				} else {
 					snum = int32(binaryToDecimal(binaryImm))
 				}
+				prevMem := 0
+				branchCheck := s.executeCBType(inst.Mnemonic, rt, int(snum))
+				if branchCheck == true {
 
-				s.executeCBType(inst.Mnemonic, rt, int(snum))
-				return fmt.Sprintf("%s %s %s  \t%d \t%s \tR%d, #%d", line[:8], line[8:27], line[27:], *memCounter, inst.Mnemonic, rt, snum), fmt.Sprintf("\t%d \t%s \tR%d, #%d", *simMem, inst.Mnemonic, rt, snum)
+					prevMem += *simMem
+					*simMem += int(snum * 4)
+					*simMem -= 4
+
+				}
+
+				return fmt.Sprintf("%s %s %s  \t%d \t%s \tR%d, #%d", line[:8], line[8:27], line[27:], *memCounter, inst.Mnemonic, rt, snum), fmt.Sprintf("\t%d \t%s \tR%d, #%d", prevMem, inst.Mnemonic, rt, snum)
 
 			case "I":
 				imm := extractBits(line, 10, 21)
@@ -350,6 +358,7 @@ func defineOpcode(line string, memCounter *int, s *Simulator, simMem *int) (stri
 				prevMem := 0
 				prevMem += *simMem
 				*simMem += int(snum * 4)
+				*simMem -= 4
 
 				return fmt.Sprintf("%s %s   \t%d \t%s   \t#%d", opcodePart, line[6:], *memCounter, inst.Mnemonic, snum), fmt.Sprintf("\t%d \t%s   \t#%d", prevMem, inst.Mnemonic, snum)
 
@@ -574,19 +583,20 @@ func (s *Simulator) executeIType(opcode string, rn int, rd int, immediate int) {
 	}
 }
 
-func (s *Simulator) executeCBType(opcode string, rn int, offset int) {
+func (s *Simulator) executeCBType(opcode string, rn int, offset int) bool {
 	switch opcode {
 	case "CBZ":
 		// Branch if zero
 		if s.Registers[rn] == 0 {
-			s.PC += int32(offset)
+			return true
 		}
 	case "CBNZ":
 		// Branch if not zero
 		if s.Registers[rn] != 0 {
-			s.PC += int32(offset)
+			return true
 		}
 	}
+	return false
 }
 
 func (s *Simulator) executeIMType(rd int, value int, shift int) {
