@@ -141,7 +141,7 @@ func main() {
 		}
 
 		// Calculate the memory address
-		memoryAddress := 96 + ((breakIndex + 1) * 4) + (i-(breakIndex+1))*4
+		memoryAddress := 96 + ((breakIndex + 1) * 4) + (i - (breakIndex + 1))
 
 		// Ensure memory is initialized up to this point
 		if memoryAddress >= len(simulator.Memory) {
@@ -492,8 +492,8 @@ func (s *Simulator) displayState(w io.Writer, breakI int) {
 	memoryOffset := startingAddress // Since your addresses directly map to indices
 
 	for i := 0; i < len(s.Memory)-memoryOffset; i += 8 {
-		address := startingAddress + i // Address increments by 8 each loop iteration
-		fmt.Fprintf(w, "%d:", address) // Print the memory address
+		address := startingAddress + i*4 // Address increments by 8 each loop iteration
+		fmt.Fprintf(w, "%d:", address)   // Print the memory address
 		for j := 0; j < 8; j++ {
 			arrayIndex := memoryOffset + i + j
 			if arrayIndex < len(s.Memory) {
