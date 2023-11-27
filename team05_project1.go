@@ -25,6 +25,8 @@ type Simulator struct {
 	Registers [32]int32
 	Memory    []int32
 	PC        int32
+	Cycle     int32
+	BranchT   bool
 }
 
 // Map to associate binary opcodes with their instruction mnemonics and types
@@ -80,7 +82,9 @@ func main() {
 	simulator := Simulator{
 		Registers: [32]int32{},
 		Memory:    []int32{},
-		PC:        0,
+		PC:        96,
+		Cycle:     1,
+		BranchT:   false,
 	}
 
 	// Open the input file for reading
@@ -159,38 +163,86 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Map to hold instruction locations and corresponding machine codes
+	instructionMap := make(map[int]string)
+	instructionAddress := 96
+
+	scan2 := bufio.NewScanner(openfile)
+	// Read the file line by line
+	for scan2.Scan() {
+		// Get the machine code from the current line
+		machineCode := scan2.Text()
+
+		// Store the machine code with its instruction address
+		instructionMap[instructionAddress] = machineCode
+
+		// Increment the instruction address by 4 for the next instruction
+		instructionAddress += 4
+	}
+
+	// Check for errors during Scan
+	if err := scan2.Err(); err != nil {
+		log.Fatalf("error during scan: %s", err)
+	}
+
+	// Print the map to verify (optional)
+	//for address, code := range instructionMap {
+	//fmt.Printf("Address: %d, Code: %s\n", address, code)
+	//}
+
+	//reset file pointer to 0
+	_, err = openfile.Seek(0, 0)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	scanner := bufio.NewScanner(openfile)
 	for scanner.Scan() {
 		fullline := scanner.Text()
-		result, resultRaw := defineOpcode(fullline, &memCounter, &simulator)
+		result, _ := defineOpcodeSim(fullline, &memCounter, &simulator)
 
 		// Write the result to the disassembler output file for both instructions and data
 		_, err := outFile.WriteString(result + "\n")
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		// Check if the current line is before the BREAK instruction
-		if memCounter <= 96+breakIndex*4 {
-			simulator.PC = int32(memCounter)
-			cycleCounter += 1
-
-			// Write the simulator state to the simulator output file
-			simLine := fmt.Sprintf("====================\n cycle:%d %s \n", cycleCounter, resultRaw)
-			_, err = outFileSim.WriteString(simLine)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			simulator.displayState(outFileSim, breakIndex+1)
-		}
-
-		// Increment the memory counter
 		memCounter += 4
+
 	}
 
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
+	}
+
+	breakHit := true
+	for breakHit {
+
+		currentPC := simulator.PC // Store the current PC before executing the instruction
+		fulllineS := instructionMap[int(simulator.PC)]
+
+		// Execute the instruction and update the simulator state
+
+		breakCheck, _ := defineOpcode(fulllineS, &memCounter, &simulator)
+
+		// Display the current state after executing the instruction
+		if breakHit {
+			cycleCounter += 1
+			simulator.displayStateUsingPC(outFileSim, breakIndex+1, decodedLines, currentPC) // Use the stored PC for display
+		}
+
+		if strings.Contains(breakCheck, "BREAK") {
+			breakHit = false
+			continue
+		}
+
+		// Update the PC for the next instruction
+		if !simulator.BranchT {
+			// Normal instruction or untaken branch
+			simulator.PC += 4
+		} else {
+			// Branch taken, PC is already updated in the instruction logic
+			simulator.BranchT = false
+		}
 	}
 }
 
@@ -475,9 +527,30 @@ func padLeft(str string, padChar byte, length int) string {
 	return str
 }
 
-func (s *Simulator) displayState(w io.Writer, breakI int) {
-	fmt.Fprintln(w)
-	fmt.Fprintf(w, "registers:\n")
+func (s *Simulator) displayState(w io.Writer, breakI int, decodedLines []string) {
+
+	index := (s.PC - 96) / 4
+
+	// Get the full line from decodedLines
+	fullLine := decodedLines[index]
+
+	// Split the line by tab character
+	parts := strings.Split(fullLine, "\t")
+
+	// Check if there are enough parts after splitting
+	if len(parts) > 2 {
+		// The second-to-last part should be the instruction
+		instruction := parts[len(parts)-2]
+		// The last part should be the operands
+		operands := parts[len(parts)-1]
+
+		// Concatenate the instruction and operands
+		fullInstruction := instruction + " " + operands
+
+		fmt.Fprintf(w, "====================\n cycle:%d\t%d\t%s\n", s.Cycle, s.PC, fullInstruction)
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "registers:\n")
+	}
 
 	for row := 0; row < 4; row++ {
 		fmt.Fprintf(w, "r%02d:", row*8)
@@ -504,6 +577,8 @@ func (s *Simulator) displayState(w io.Writer, breakI int) {
 		}
 		fmt.Fprintln(w)
 	}
+
+	s.Cycle += 1
 
 }
 
@@ -573,12 +648,14 @@ func (s *Simulator) executeCBType(opcode string, rn int, offset int) {
 	case "CBZ":
 		// Branch if zero
 		if s.Registers[rn] == 0 {
-			s.PC += int32(offset)
+			s.PC += int32(offset) * 4
+			s.BranchT = true
 		}
 	case "CBNZ":
 		// Branch if not zero
 		if s.Registers[rn] != 0 {
-			s.PC += int32(offset)
+			s.PC += int32(offset) * 4
+			s.BranchT = true
 		}
 	}
 }
@@ -590,7 +667,8 @@ func (s *Simulator) executeIMType(rd int, value int, shift int) {
 
 func (s *Simulator) executeBType(offset int) {
 	// Branch to offset
-	s.PC += int32(offset)
+	s.PC += int32(offset) * 4
+	s.BranchT = true
 }
 
 func defineOpcodeSim(line string, memCounter *int, s *Simulator) (string, string) {
@@ -789,4 +867,66 @@ func (s *Simulator) ensureMemoryInitialized(upToIndex int) {
 		// Append the zeros to the memory slice
 		s.Memory = append(s.Memory, zeros...)
 	}
+}
+
+func (s *Simulator) displayStateUsingPC(w io.Writer, breakI int, decodedLines []string, PC int32) {
+
+	index := (PC - 96) / 4
+
+	// Get the full line from decodedLines
+	fullLine := decodedLines[index]
+
+	// Split the line by tab character
+	parts := strings.Split(fullLine, "\t")
+
+	// Check if the current instruction is BREAK
+	if strings.Contains(fullLine, "BREAK") {
+		// Format the output for BREAK instruction
+		fmt.Fprintf(w, "====================\n cycle:%d\t%d\tBREAK\n", s.Cycle, PC)
+	} else if len(parts) > 2 {
+		// The second-to-last part should be the instruction
+		instruction := parts[len(parts)-2]
+		// The last part should be the operands
+		operands := parts[len(parts)-1]
+
+		// Concatenate the instruction and operands
+		fullInstruction := instruction + "\t" + operands
+
+		fmt.Fprintf(w, "====================\n cycle:%d\t%d\t%s\n", s.Cycle, PC, fullInstruction)
+	} else {
+		// Handle unexpected format
+		fmt.Fprintf(w, "Error: Unexpected instruction format at PC %d\n", PC)
+	}
+
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "registers:\n")
+
+	for row := 0; row < 4; row++ {
+		fmt.Fprintf(w, "r%02d:", row*8)
+		for col := 0; col < 8; col++ {
+			fmt.Fprintf(w, "\t%d\t", s.Registers[row*8+col])
+		}
+		fmt.Fprintf(w, "\n")
+	}
+	fmt.Fprintf(w, "\ndata:\n")
+
+	startingAddress := 96 + breakI*4
+	memoryOffset := startingAddress // Since your addresses directly map to indices
+
+	for i := 0; i < len(s.Memory)-memoryOffset; i += 8 {
+		address := startingAddress + i*4 // Address increments by 8 each loop iteration
+		fmt.Fprintf(w, "%d:", address)   // Print the memory address
+		for j := 0; j < 8; j++ {
+			arrayIndex := memoryOffset + i + j
+			if arrayIndex < len(s.Memory) {
+				fmt.Fprintf(w, "\t%d", s.Memory[arrayIndex])
+			} else {
+				fmt.Fprintf(w, "\t0") // Pad with zeros if index is out of bounds
+			}
+		}
+		fmt.Fprintln(w)
+	}
+
+	s.Cycle += 1
+
 }
